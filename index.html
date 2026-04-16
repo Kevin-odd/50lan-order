@@ -1106,11 +1106,7 @@ async function loadSession(sessionId) {
   showView('viewOrder');
   renderForm();
 
-  // Restore name
-  const savedName = localStorage.getItem('userName');
-  if (savedName) {
-    document.getElementById('inputName').value = savedName;
-  }
+  // Name field always starts empty for new visitors
 }
 
 /* ==============================================================
@@ -1124,7 +1120,7 @@ async function submitOrder() {
   if (!selectedSugar) { showToast('請選擇甜度'); return; }
   if (!selectedIce) { showToast('請選擇冰塊'); return; }
 
-  localStorage.setItem('userName', name);
+  // Name not saved to localStorage - each visit starts fresh
   const editToken = localStorage.getItem('editToken_' + currentSessionId) || ('et_' + generateId());
   localStorage.setItem('editToken_' + currentSessionId, editToken);
 
