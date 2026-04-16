@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#E8960C" />
+<title>50嵐揪團點單</title>
+
+<!-- Firebase SDK (compat for simpler single-file usage) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+/* ============================================================
+   0. RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; overscroll-behavior-y: contain; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+  background: #FFFBF0;
+  color: #1a1a1a;
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-text-size-adjust: 100%;
+  min-height: 100dvh;
+}
+button { font-family: inherit; cursor: pointer; border: 0; -webkit-tap-highlight-color: transparent; }
+input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ }
+
+/* ============================================================
+   1. LAYOUT
+   ============================================================ */
+.container { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+
+/* ============================================================
+   2. HEADER
+   ============================================================ */
+.header {
+  position: sticky; top: 0; z-index: 50;
+  background: linear-gradient(135deg, #E8960C 0%, #D4820A 100%);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  padding-top: env(safe-area-inset-top);
+}
+.header-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  max-width: 480px; margin: 0 auto;
+}
+.header h1 { font-size: 20px; font-weight: 800; margin: 0; letter-spacing: 0.5px; }
+.header-subtitle { font-size: 11px; opacity: 0.85; margin: 2px 0 0; }
+.header-actions { display: flex; gap: 8px; }
+.header-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff; font-size: 13px; font-weight: 600;
+  padding: 8px 14px; border-radius: 20px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.header-btn:active { background: rgba(255,255,255,0.35); }
+.header-btn.danger { background: rgba(200,0,0,0.3); }
+.header-btn.danger:active { background: rgba(200,0,0,0.5); }
+
+/* ============================================================
+   3. LANDING PAGE
+   ============================================================ */
+.view { display: none; }
+.view.active { display: block; }
+
+.landing {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: calc(100dvh - 60px);
+  padding: 32px 16px;
+  text-align: center;
+}
+.landing-logo {
+  font-size: 72px; margin-bottom: 16px;
+  animation: bounce 2s ease-in-out infinite;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.landing h2 { font-size: 28px; font-weight: 800; margin: 0 0 8px; color: #E8960C; }
+.landing p { font-size: 15px; color: #666; margin: 0 0 32px; line-height: 1.5; }
+.create-btn {
+  background: linear-gradient(135deg, #E8960C 0%, #D4820A 100%);
+  color: #fff; font-size: 20px; font-weight: 700;
+  padding: 18px 48px; border-radius: 50px;
+  box-shadow: 0 4px 16px rgba(232,150,12,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.create-btn:active { transform: scale(0.96); box-shadow: 0 2px 8px rgba(232,150,12,0.3); }
+
+/* ============================================================
+   4. STATUS BAR
+   ============================================================ */
+.status-bar {
+  background: #fff;
+  border-bottom: 1px solid #f0e6d6;
+  padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 480px; margin: 0 auto;
+  font-size: 13px; color: #888;
+}
+.status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-weight: 600; font-size: 13px;
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.open { background: #22c55e; }
+.status-dot.closed { background: #ef4444; }
+
+/* ============================================================
+   5. ORDER FORM
+   ============================================================ */
+.form-section {
+  max-width: 480px; margin: 0 auto;
+  padding: 16px;
+}
+.form-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  padding: 20px 16px;
+  margin-bottom: 16px;
+}
+.form-card h3 {
+  font-size: 15px; font-weight: 700; margin: 0 0 12px;
+  color: #333; display: flex; align-items: center; gap: 6px;
+}
+.form-card h3 .step-num {
+  background: #E8960C; color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+
+/* Name input */
+.name-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  font-size: 16px;
+  transition: border-color 0.2s;
+  outline: none;
+  background: #fafafa;
+}
+.name-input:focus { border-color: #E8960C; background: #fff; }
+
+/* Category tabs */
+.category-tabs {
+  display: flex; gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.cat-tab {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px; font-weight: 600;
+  background: #f5f0e8;
+  color: #666;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.cat-tab.active { background: #E8960C; color: #fff; }
+.cat-tab:active { transform: scale(0.95); }
+
+/* Drink grid */
+.drink-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.drink-card {
+  padding: 14px 10px;
+  border: 2px solid #f0e6d6;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 14px; font-weight: 600;
+  color: #333;
+  background: #fff;
+  transition: all 0.15s;
+  min-height: 52px;
+  display: flex; align-items: center; justify-content: center;
+}
+.drink-card.selected { border-color: #E8960C; background: #FFF8EB; color: #E8960C; }
+.drink-card:active { transform: scale(0.96); }
+.drink-card .drink-tag {
+  font-size: 11px; font-weight: 400; color: #999;
+  display: block; margin-top: 2px;
+}
+.drink-card.selected .drink-tag { color: #E8960C; }
+
+/* Pill buttons (sugar / ice) */
+.pill-group {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.pill-btn {
+  padding: 10px 14px;
+  border: 2px solid #eee;
+  border-radius: 20px;
+  font-size: 14px; font-weight: 500;
+  background: #fff; color: #555;
+  transition: all 0.15s;
+}
+.pill-btn.active { border-color: #E8960C; background: #FFF8EB; color: #E8960C; font-weight: 600; }
+.pill-btn:active { transform: scale(0.95); }
+
+/* Toppings checkboxes */
+.topping-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.topping-chip {
+  padding: 10px 12px;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  font-size: 14px; font-weight: 500;
+  background: #fff; color: #555;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.topping-chip .check-icon { opacity: 0; transition: opacity 0.15s; font-size: 16px; }
+.topping-chip.active { border-color: #E8960C; background: #FFF8EB; color: #E8960C; }
+.topping-chip.active .check-icon { opacity: 1; }
+.topping-chip:active { transform: scale(0.96); }
+
+/* Note textarea */
+.note-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  font-size: 14px;
+  resize: none;
+  min-height: 60px;
+  outline: none;
+  background: #fafafa;
+  transition: border-color 0.2s;
+}
+.note-input:focus { border-color: #E8960C; background: #fff; }
+
+/* Submit button */
+.submit-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: 14px;
+  font-size: 17px; font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #E8960C 0%, #D4820A 100%);
+  box-shadow: 0 4px 12px rgba(232,150,12,0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+  margin-top: 8px;
+}
+.submit-btn:active { transform: scale(0.97); }
+.submit-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+/* Add another button */
+.add-another-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 16px; font-weight: 600;
+  color: #E8960C;
+  background: #FFF8EB;
+  border: 2px dashed #E8960C;
+  margin-top: 12px;
+  transition: all 0.15s;
+}
+.add-another-btn:active { background: #FFEED0; }
+
+/* ============================================================
+   6. LIVE ORDER LIST
+   ============================================================ */
+.order-list-section {
+  max-width: 480px; margin: 0 auto;
+  padding: 0 16px 120px;
+}
+.section-title {
+  font-size: 16px; font-weight: 700; color: #333;
+  margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
+}
+.section-title .count-badge {
+  background: #E8960C; color: #fff;
+  font-size: 12px; font-weight: 700;
+  padding: 2px 10px; border-radius: 10px;
+}
+
+.order-item {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.order-item-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.order-item-name { font-weight: 700; font-size: 15px; color: #E8960C; }
+.order-item-drink { font-weight: 600; font-size: 15px; }
+.order-item-details { font-size: 13px; color: #888; margin-top: 2px; }
+.order-item-actions { display: flex; gap: 6px; }
+.order-item-btn {
+  font-size: 12px; padding: 4px 10px; border-radius: 8px;
+  background: #f5f0e8; color: #888; font-weight: 600;
+}
+.order-item-btn.delete { color: #ef4444; background: #fef2f2; }
+.order-item-btn:active { opacity: 0.7; }
+
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 40px 20px; color: #bbb;
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 8px; }
+.empty-state p { font-size: 14px; }
+
+/* ============================================================
+   7. SUMMARY (CLOSED STATE)
+   ============================================================ */
+.summary-section {
+  max-width: 480px; margin: 0 auto;
+  padding: 16px 16px 120px;
+}
+.summary-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  padding: 20px 16px;
+  margin-bottom: 12px;
+}
+.summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f0e8;
+  font-size: 14px;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-row .drink-name { font-weight: 600; }
+.summary-row .drink-count { font-weight: 700; color: #E8960C; }
+.summary-total {
+  font-size: 20px; font-weight: 800; color: #E8960C;
+  text-align: center; padding: 16px 0 8px;
+}
+.copy-summary-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 16px; font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 4px 12px rgba(34,197,94,0.3);
+  margin-top: 12px;
+  transition: transform 0.15s;
+}
+.copy-summary-btn:active { transform: scale(0.97); }
+
+.reopen-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 16px; font-weight: 700;
+  color: #E8960C;
+  background: #FFF8EB;
+  border: 2px solid #E8960C;
+  margin-top: 8px;
+  transition: transform 0.15s;
+}
+.reopen-btn:active { transform: scale(0.97); }
+
+/* ============================================================
+   8. TOAST
+   ============================================================ */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: #333; color: #fff;
+  padding: 12px 24px; border-radius: 12px;
+  font-size: 14px; font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 999;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* ============================================================
+   8b. COPY MODAL
+   ============================================================ */
+.copy-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.copy-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 400px; width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.copy-modal h4 {
+  margin: 0 0 12px; font-size: 16px; font-weight: 700; color: #333;
+}
+.copy-modal textarea {
+  width: 100%; min-height: 120px;
+  border: 2px solid #E8960C; border-radius: 10px;
+  padding: 12px; font-size: 14px; font-family: inherit;
+  resize: none; background: #FFFBF0; color: #333;
+}
+.copy-modal .hint {
+  font-size: 12px; color: #999; margin: 8px 0 0; text-align: center;
+}
+.copy-modal-close {
+  width: 100%; margin-top: 12px;
+  padding: 12px; border-radius: 10px;
+  font-size: 15px; font-weight: 600;
+  background: #E8960C; color: #fff;
+}
+.copy-modal-close:active { opacity: 0.8; }
+
+/* ============================================================
+   9. CLOSED BANNER
+   ============================================================ */
+.closed-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 16px;
+  max-width: 448px;
+  margin-left: auto; margin-right: auto;
+  text-align: center;
+  font-size: 15px; font-weight: 600; color: #ef4444;
+}
+
+/* ============================================================
+   10. LOADING
+   ============================================================ */
+.loading-overlay {
+  position: fixed; inset: 0;
+  background: rgba(255,251,240,0.9);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  flex-direction: column; gap: 12px;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #f0e6d6;
+  border-top-color: #E8960C;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   11. FORM COLLAPSED STATE
+   ============================================================ */
+.form-collapsed { display: none; }
+
+/* ============================================================
+   12. CONFIRMATION CHECK
+   ============================================================ */
+.confirm-anim {
+  text-align: center; padding: 24px 16px;
+  animation: fadeInUp 0.4s ease-out;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.confirm-anim .check { font-size: 56px; }
+.confirm-anim p { font-size: 16px; font-weight: 600; color: #22c55e; margin: 8px 0 0; }
+
+/* Utility: hide */
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay hidden" id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:#999;">載入中...</div>
+</div>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header class="header">
+  <div class="header-inner">
+    <div>
+      <h1>50嵐揪團</h1>
+      <p class="header-subtitle" id="headerSubtitle">大家一起來點飲料</p>
+    </div>
+    <div class="header-actions" id="headerActions"></div>
+  </div>
+</header>
+
+<!-- ============================================================
+     VIEW: LANDING
+     ============================================================ -->
+<div class="view active" id="viewLanding">
+  <div class="landing">
+    <div class="landing-logo">&#x1F9CB;</div>
+    <h2>50嵐揪團點單</h2>
+    <p>一鍵建立訂單連結<br/>同事打開就能點，即時同步超方便</p>
+    <button class="create-btn" onclick="createSession()">我要揪團</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     VIEW: ORDER
+     ============================================================ -->
+<div class="view" id="viewOrder">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-badge">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText"></span>
+    </div>
+    <div style="font-size:12px;color:#bbb;" id="orderCount"></div>
+  </div>
+
+  <!-- Closed banner (only visible when closed & not organizer) -->
+  <div class="closed-banner hidden" id="closedBanner">
+    此訂單已結單，無法再新增或修改
+  </div>
+
+  <!-- Order form -->
+  <div class="form-section" id="formSection">
+
+    <!-- Confirmation animation (hidden by default) -->
+    <div class="confirm-anim hidden" id="confirmAnim">
+      <div class="check">&#x2705;</div>
+      <p>已送出！</p>
+    </div>
+
+    <div id="orderForm">
+      <!-- Step 1: Name -->
+      <div class="form-card">
+        <h3><span class="step-num">1</span> 你的名字</h3>
+        <input type="text" class="name-input" id="inputName" placeholder="輸入姓名或暱稱" maxlength="20" />
+      </div>
+
+      <!-- Step 2: Drink selection -->
+      <div class="form-card">
+        <h3><span class="step-num">2</span> 選擇飲料</h3>
+        <div class="category-tabs" id="categoryTabs"></div>
+        <div class="drink-grid" id="drinkGrid"></div>
+      </div>
+
+      <!-- Step 3: Size -->
+      <div class="form-card">
+        <h3><span class="step-num">3</span> 容量</h3>
+        <div class="pill-group" id="sizeGroup"></div>
+      </div>
+
+      <!-- Step 4: Sugar -->
+      <div class="form-card">
+        <h3><span class="step-num">4</span> 甜度</h3>
+        <div class="pill-group" id="sugarGroup"></div>
+      </div>
+
+      <!-- Step 5: Ice -->
+      <div class="form-card">
+        <h3><span class="step-num">5</span> 冰塊</h3>
+        <div class="pill-group" id="iceGroup"></div>
+      </div>
+
+      <!-- Step 6: Toppings -->
+      <div class="form-card">
+        <h3><span class="step-num">6</span> 加料（可複選）</h3>
+        <div class="topping-grid" id="toppingGrid"></div>
+      </div>
+
+      <!-- Step 7: Note -->
+      <div class="form-card">
+        <h3><span class="step-num">7</span> 備註（選填）</h3>
+        <textarea class="note-input" id="inputNote" placeholder="例如：大杯、少量冰塊等..." rows="2"></textarea>
+      </div>
+
+      <!-- Submit -->
+      <button class="submit-btn" id="submitBtn" onclick="submitOrder()">送出點單</button>
+    </div>
+
+    <!-- Add another (shown after submit) -->
+    <button class="add-another-btn hidden" id="addAnotherBtn" onclick="showFormAgain()">
+      ＋ 再點一杯
+    </button>
+  </div>
+
+  <!-- Live order list -->
+  <div class="order-list-section">
+    <div class="section-title">
+      目前訂購清單 <span class="count-badge" id="listCount">0</span>
+    </div>
+    <div id="orderList">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">&#x1F37B;</div>
+        <p>還沒有人點單，來當第一個吧！</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary section (shown when closed, for organizer) -->
+  <div class="summary-section hidden" id="summarySection">
+    <div class="summary-card" id="summaryContent"></div>
+    <button class="copy-summary-btn" onclick="copySummary()">&#x1F4CB; 複製統計摘要（方便訂餐）</button>
+    <button class="reopen-btn hidden" id="reopenBtn" onclick="reopenSession()">&#x1F513; 重新開放點單</button>
+  </div>
+</div>
+
+<script>
+/* ==============================================================
+   FIREBASE CONFIG - PLACEHOLDER
+   ==============================================================
+   請替換為你自己的 Firebase 專案設定：
+   1. 到 https://console.firebase.google.com 建立專案（免費）
+   2. 建立 Web App，複製 firebaseConfig
+   3. 到 Firestore Database 頁面，建立資料庫（選 production mode）
+   4. 設定安全規則（見下方 FIRESTORE_RULES）
+   ============================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAXdnViRgMz5gEBkNJSNi8VzlhVpdSUQYg",
+  authDomain: "lan-order.firebaseapp.com",
+  projectId: "lan-order",
+  storageBucket: "lan-order.firebasestorage.app",
+  messagingSenderId: "495574648237",
+  appId: "1:495574648237:web:dad7111d57d6cbf2e2cd24"
+};
+
+/*
+   FIRESTORE RULES（到 Firebase Console > Firestore > Rules 貼上）:
+
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /sessions/{sessionId} {
+         allow read: if true;
+         allow create: if true;
+         allow update: if true;
+       }
+       match /sessions/{sessionId}/orders/{orderId} {
+         allow read: if true;
+         allow create: if true;
+         allow update: if true;
+         allow delete: if true;
+       }
+     }
+   }
+*/
+
+/* ==============================================================
+   MENU DATA
+   ============================================================== */
+const MENU = {
+  categories: [
+    { id: 'tea', name: '找好茶', icon: '&#x1F375;' },
+    { id: 'milk_tea', name: '找奶茶', icon: '&#x1F95B;' },
+    { id: 'latte', name: '找拿鐵', icon: '&#x1F37C;' },
+    { id: 'special', name: '找口感', icon: '&#x2B50;' },
+    { id: 'macchiato', name: '瑪奇朵', icon: '&#x2601;' },
+    { id: 'fresh', name: '找新鮮', icon: '&#x1F34B;' }
+  ],
+  items: [
+    // 找好茶
+    { name: '茉莉綠茶', category: 'tea', tag: '清爽解渴' },
+    { name: '阿薩姆紅茶', category: 'tea', tag: '經典基底茶' },
+    { name: '四季春青茶', category: 'tea', tag: '50嵐招牌' },
+    { name: '黃金烏龍', category: 'tea', tag: '焙火香氣' },
+    // 找奶茶
+    { name: '奶茶', category: 'milk_tea', tag: '經典' },
+    { name: '奶綠', category: 'milk_tea', tag: '經典' },
+    { name: '烏龍奶茶', category: 'milk_tea', tag: '經典' },
+    { name: '珍珠奶茶', category: 'milk_tea', tag: '國民飲料' },
+    { name: '波霸奶茶', category: 'milk_tea', tag: '國民飲料' },
+    { name: '燕麥奶茶', category: 'milk_tea', tag: '飽足感' },
+    { name: '布丁奶茶', category: 'milk_tea', tag: '甜度較高' },
+    // 找拿鐵
+    { name: '紅茶拿鐵', category: 'latte', tag: '鮮乳調配' },
+    { name: '綠茶拿鐵', category: 'latte', tag: '鮮乳調配' },
+    { name: '波霸紅茶拿鐵', category: 'latte', tag: '招牌必點' },
+    { name: '麵茶紅茶拿鐵', category: 'latte', tag: '復古人氣' },
+    { name: '燕麥阿華田', category: 'latte', tag: '冬季熱門' },
+    // 找口感
+    { name: '1號 (四季春+珍波椰)', category: 'special', tag: '銷量冠軍' },
+    { name: '8冰綠 (金桔+梅汁+綠茶)', category: 'special', tag: '酸甜NO.1' },
+    { name: '梅の綠', category: 'special', tag: '果香酸甜' },
+    { name: '冰淇淋紅茶', category: 'special', tag: '隱藏招牌' },
+    // 瑪奇朵
+    { name: '紅茶瑪奇朵', category: 'macchiato', tag: '甜奶蓋' },
+    { name: '烏龍瑪奇朵', category: 'macchiato', tag: '茶味平衡' },
+    { name: '四季奶青瑪奇朵', category: 'macchiato', tag: '網友熱推' },
+    // 找新鮮
+    { name: '檸檬綠', category: 'fresh', tag: '鮮酸甜' },
+    { name: '金桔檸檬', category: 'fresh', tag: '鮮酸甜' },
+    { name: '多多綠茶', category: 'fresh', tag: '經典不敗' },
+    { name: '鮮柚綠', category: 'fresh', tag: '季節限定' },
+    { name: '葡萄柚果粒茶', category: 'fresh', tag: '鮮果系列' }
+  ],
+  size: [
+    { name: '中杯', value: 'medium' },
+    { name: '大杯', value: 'large' }
+  ],
+  sugar: [
+    { name: '正常', value: 'regular' },
+    { name: '少糖', value: 'less' },
+    { name: '半糖', value: 'half' },
+    { name: '微糖', value: 'low' },
+    { name: '一分糖', value: 'trace' },
+    { name: '無糖', value: 'none' }
+  ],
+  ice: [
+    { name: '正常冰', value: 'regular' },
+    { name: '少冰', value: 'less' },
+    { name: '微冰', value: 'low' },
+    { name: '去冰', value: 'none' },
+    { name: '完全去冰', value: 'completely_none' },
+    { name: '常溫', value: 'room_temp' },
+    { name: '溫', value: 'warm' },
+    { name: '熱', value: 'hot' }
+  ],
+  toppings: [
+    { name: '波霸', value: 'boba' },
+    { name: '珍珠', value: 'pearl' },
+    { name: '椰果', value: 'coconut_jelly' },
+    { name: '仙草凍', value: 'grass_jelly' },
+    { name: '燕麥', value: 'oat' },
+    { name: '布丁', value: 'pudding' },
+    { name: '冰淇淋', value: 'ice_cream' },
+    { name: '奶霜', value: 'macchiato' }
+  ]
+};
+
+/* ==============================================================
+   STATE
+   ============================================================== */
+let db = null;
+let currentSessionId = null;
+let currentSession = null;
+let orders = [];
+let unsubSession = null;
+let unsubOrders = null;
+let isFirebaseReady = false;
+
+// Form state
+let selectedDrink = null;
+let selectedSize = null;
+let selectedSugar = null;
+let selectedIce = null;
+let selectedToppings = new Set();
+let activeCategory = 'tea';
+let editingOrderId = null;
+
+/* ==============================================================
+   FIREBASE INIT
+   ============================================================== */
+function initFirebase() {
+  try {
+    if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+      console.warn('Firebase config not set. Running in demo mode.');
+      isFirebaseReady = false;
+      return;
+    }
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    isFirebaseReady = true;
+  } catch (e) {
+    console.error('Firebase init error:', e);
+    isFirebaseReady = false;
+  }
+}
+
+/* ==============================================================
+   DEMO MODE (when Firebase is not configured)
+   ============================================================== */
+const demoSessions = {};
+const demoOrders = {};
+let demoListeners = { session: null, orders: null };
+
+function generateId() {
+  return 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+}
+
+/* ==============================================================
+   SESSION MANAGEMENT
+   ============================================================== */
+async function createSession() {
+  const sessionId = generateId();
+  const organizerToken = 'org_' + generateId();
+
+  if (isFirebaseReady) {
+    showLoading(true);
+    try {
+      await db.collection('sessions').doc(sessionId).set({
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 'OPEN',
+        organizerToken: organizerToken
+      });
+    } catch (e) {
+      console.error('Create session error:', e);
+      showToast('建立失敗，請稍後再試');
+      showLoading(false);
+      return;
+    }
+    showLoading(false);
+  } else {
+    // Demo mode
+    demoSessions[sessionId] = {
+      createdAt: new Date(),
+      status: 'OPEN',
+      organizerToken: organizerToken
+    };
+    demoOrders[sessionId] = [];
+  }
+
+  localStorage.setItem('organizer_' + sessionId, organizerToken);
+  // Also save last used name
+  window.location.hash = '#/order/' + sessionId;
+}
+
+async function loadSession(sessionId) {
+  currentSessionId = sessionId;
+  showLoading(true);
+
+  // Reset form state for fresh session
+  selectedDrink = null;
+  selectedSize = null;
+  selectedSugar = null;
+  selectedIce = null;
+  selectedToppings = new Set();
+  activeCategory = 'tea';
+  editingOrderId = null;
+  document.getElementById('inputNote').value = '';
+  document.getElementById('orderForm').classList.remove('hidden');
+  document.getElementById('confirmAnim').classList.add('hidden');
+  document.getElementById('addAnotherBtn').classList.add('hidden');
+  document.getElementById('submitBtn').textContent = '送出點單';
+
+  // Cleanup previous listeners
+  if (unsubSession) unsubSession();
+  if (unsubOrders) unsubOrders();
+
+  if (isFirebaseReady) {
+    // Listen to session
+    unsubSession = db.collection('sessions').doc(sessionId).onSnapshot(doc => {
+      if (!doc.exists) {
+        showToast('找不到此訂單');
+        window.location.hash = '#/';
+        return;
+      }
+      currentSession = doc.data();
+      renderSessionState();
+    }, err => {
+      console.error('Session listener error:', err);
+      showToast('連線錯誤');
+    });
+
+    // Listen to orders
+    unsubOrders = db.collection('sessions').doc(sessionId).collection('orders')
+      .orderBy('createdAt', 'asc')
+      .onSnapshot(snapshot => {
+        orders = [];
+        snapshot.forEach(doc => {
+          orders.push({ id: doc.id, ...doc.data() });
+        });
+        renderOrderList();
+        showLoading(false);
+      }, err => {
+        console.error('Orders listener error:', err);
+        showLoading(false);
+      });
+  } else {
+    // Demo mode
+    if (!demoSessions[sessionId]) {
+      demoSessions[sessionId] = {
+        createdAt: new Date(),
+        status: 'OPEN',
+        organizerToken: 'none'
+      };
+      demoOrders[sessionId] = [];
+    }
+    currentSession = demoSessions[sessionId];
+    orders = demoOrders[sessionId] || [];
+    renderSessionState();
+    renderOrderList();
+    showLoading(false);
+  }
+
+  showView('viewOrder');
+  renderForm();
+
+  // Restore name
+  const savedName = localStorage.getItem('userName');
+  if (savedName) {
+    document.getElementById('inputName').value = savedName;
+  }
+}
+
+/* ==============================================================
+   ORDER CRUD
+   ============================================================== */
+async function submitOrder() {
+  const name = document.getElementById('inputName').value.trim();
+  if (!name) { showToast('請輸入你的名字'); return; }
+  if (!selectedDrink) { showToast('請選擇飲料'); return; }
+  if (!selectedSize) { showToast('請選擇容量'); return; }
+  if (!selectedSugar) { showToast('請選擇甜度'); return; }
+  if (!selectedIce) { showToast('請選擇冰塊'); return; }
+
+  localStorage.setItem('userName', name);
+  const editToken = localStorage.getItem('editToken_' + currentSessionId) || ('et_' + generateId());
+  localStorage.setItem('editToken_' + currentSessionId, editToken);
+
+  const orderData = {
+    userName: name,
+    drinkName: selectedDrink,
+    size: selectedSize,
+    sugar: selectedSugar,
+    ice: selectedIce,
+    toppings: [...selectedToppings],
+    note: document.getElementById('inputNote').value.trim(),
+    createdAt: isFirebaseReady ? firebase.firestore.FieldValue.serverTimestamp() : new Date(),
+    editToken: editToken
+  };
+
+  document.getElementById('submitBtn').disabled = true;
+
+  if (isFirebaseReady) {
+    try {
+      if (editingOrderId) {
+        await db.collection('sessions').doc(currentSessionId).collection('orders').doc(editingOrderId).update(orderData);
+        editingOrderId = null;
+      } else {
+        await db.collection('sessions').doc(currentSessionId).collection('orders').add(orderData);
+      }
+    } catch (e) {
+      console.error('Submit error:', e);
+      showToast('送出失敗，請稍後再試');
+      document.getElementById('submitBtn').disabled = false;
+      return;
+    }
+  } else {
+    // Demo mode
+    if (editingOrderId) {
+      const idx = demoOrders[currentSessionId].findIndex(o => o.id === editingOrderId);
+      if (idx >= 0) demoOrders[currentSessionId][idx] = { id: editingOrderId, ...orderData, createdAt: new Date() };
+      editingOrderId = null;
+    } else {
+      orderData.createdAt = new Date();
+      const id = 'order_' + generateId();
+      demoOrders[currentSessionId].push({ id, ...orderData });
+    }
+    orders = demoOrders[currentSessionId];
+    renderOrderList();
+  }
+
+  document.getElementById('submitBtn').disabled = false;
+
+  // Show confirmation
+  document.getElementById('orderForm').classList.add('hidden');
+  document.getElementById('confirmAnim').classList.remove('hidden');
+  document.getElementById('addAnotherBtn').classList.remove('hidden');
+
+  // Reset form selections (but keep name)
+  resetFormSelections();
+}
+
+async function deleteOrder(orderId) {
+  if (isFirebaseReady) {
+    try {
+      await db.collection('sessions').doc(currentSessionId).collection('orders').doc(orderId).delete();
+    } catch (e) {
+      showToast('刪除失敗');
+    }
+  } else {
+    demoOrders[currentSessionId] = demoOrders[currentSessionId].filter(o => o.id !== orderId);
+    orders = demoOrders[currentSessionId];
+    renderOrderList();
+  }
+}
+
+function editOrder(orderId) {
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  editingOrderId = orderId;
+
+  // Show form
+  document.getElementById('orderForm').classList.remove('hidden');
+  document.getElementById('confirmAnim').classList.add('hidden');
+  document.getElementById('addAnotherBtn').classList.add('hidden');
+
+  // Fill form
+  document.getElementById('inputName').value = order.userName;
+
+  // Find category for drink
+  const drinkItem = MENU.items.find(i => i.name === order.drinkName);
+  if (drinkItem) {
+    setActiveCategory(drinkItem.category);
+  }
+  selectDrink(order.drinkName);
+
+  // Size
+  selectedSize = order.size || '中杯';
+  renderSizePills();
+
+  // Sugar
+  selectedSugar = order.sugar;
+  renderSugarPills();
+
+  // Ice
+  selectedIce = order.ice;
+  renderIcePills();
+
+  // Toppings
+  selectedToppings = new Set(order.toppings || []);
+  renderToppings();
+
+  // Note
+  document.getElementById('inputNote').value = order.note || '';
+
+  // Update button text
+  document.getElementById('submitBtn').textContent = '更新點單';
+
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ==============================================================
+   SESSION STATE CHANGES
+   ============================================================== */
+async function closeSession() {
+  if (!confirm('確定要結單嗎？結單後其他人將無法新增或修改點單。')) return;
+
+  if (isFirebaseReady) {
+    try {
+      await db.collection('sessions').doc(currentSessionId).update({ status: 'CLOSED' });
+    } catch (e) {
+      showToast('結單失敗');
+    }
+  } else {
+    demoSessions[currentSessionId].status = 'CLOSED';
+    currentSession = demoSessions[currentSessionId];
+    renderSessionState();
+  }
+}
+
+async function reopenSession() {
+  if (isFirebaseReady) {
+    try {
+      await db.collection('sessions').doc(currentSessionId).update({ status: 'OPEN' });
+    } catch (e) {
+      showToast('開放失敗');
+    }
+  } else {
+    demoSessions[currentSessionId].status = 'OPEN';
+    currentSession = demoSessions[currentSessionId];
+    renderSessionState();
+  }
+}
+
+/* ==============================================================
+   RENDERING
+   ============================================================== */
+function showView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(viewId).classList.add('active');
+}
+
+function renderSessionState() {
+  if (!currentSession) return;
+  const isOpen = currentSession.status === 'OPEN';
+  const isOrganizer = localStorage.getItem('organizer_' + currentSessionId) === currentSession.organizerToken;
+
+  // Status
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + (isOpen ? 'open' : 'closed');
+  document.getElementById('statusText').textContent = isOpen ? '點單中' : '已結單';
+
+  // Header actions
+  const actions = document.getElementById('headerActions');
+  actions.innerHTML = '';
+
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'header-btn';
+  shareBtn.textContent = '分享連結';
+  shareBtn.onclick = shareLink;
+  actions.appendChild(shareBtn);
+
+  if (isOrganizer) {
+    if (isOpen) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'header-btn danger';
+      closeBtn.textContent = '結單';
+      closeBtn.onclick = closeSession;
+      actions.appendChild(closeBtn);
+    }
+  }
+
+  // Header subtitle
+  document.getElementById('headerSubtitle').textContent = isOpen ? '點單進行中' : '訂單已結單';
+
+  // Form visibility
+  const formSection = document.getElementById('formSection');
+  const closedBanner = document.getElementById('closedBanner');
+  const summarySection = document.getElementById('summarySection');
+
+  if (isOpen) {
+    formSection.classList.remove('hidden');
+    closedBanner.classList.add('hidden');
+    summarySection.classList.add('hidden');
+    renderOrderList(); // Re-render to show edit/delete buttons
+  } else {
+    formSection.classList.add('hidden');
+    closedBanner.classList.remove('hidden');
+    summarySection.classList.remove('hidden');
+    renderSummary();
+    renderOrderList(); // Re-render to hide edit/delete buttons
+    if (isOrganizer) {
+      document.getElementById('reopenBtn').classList.remove('hidden');
+    }
+  }
+}
+
+function renderForm() {
+  renderCategoryTabs();
+  renderDrinkGrid();
+  renderSizePills();
+  renderSugarPills();
+  renderIcePills();
+  renderToppings();
+}
+
+function renderSizePills() {
+  renderPills('sizeGroup', MENU.size, selectedSize, v => { selectedSize = v; renderSizePills(); });
+}
+function renderSugarPills() {
+  renderPills('sugarGroup', MENU.sugar, selectedSugar, v => { selectedSugar = v; renderSugarPills(); });
+}
+function renderIcePills() {
+  renderPills('iceGroup', MENU.ice, selectedIce, v => { selectedIce = v; renderIcePills(); });
+}
+
+function renderCategoryTabs() {
+  const container = document.getElementById('categoryTabs');
+  container.innerHTML = MENU.categories.map(cat =>
+    `<button class="cat-tab ${cat.id === activeCategory ? 'active' : ''}" onclick="setActiveCategory('${cat.id}')">${cat.name}</button>`
+  ).join('');
+}
+
+function setActiveCategory(catId) {
+  activeCategory = catId;
+  renderCategoryTabs();
+  renderDrinkGrid();
+}
+
+function renderDrinkGrid() {
+  const container = document.getElementById('drinkGrid');
+  const items = MENU.items.filter(i => i.category === activeCategory);
+  container.innerHTML = items.map(item =>
+    `<button class="drink-card ${selectedDrink === item.name ? 'selected' : ''}" onclick="selectDrink('${item.name.replace(/'/g, "\\'")}')">
+      ${item.name}
+    </button>`
+  ).join('');
+}
+
+function selectDrink(name) {
+  selectedDrink = name;
+  renderDrinkGrid();
+}
+
+function renderPills(containerId, options, selectedValue, onSelect) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = options.map(opt =>
+    `<button class="pill-btn ${selectedValue === opt.name ? 'active' : ''}">${opt.name}</button>`
+  ).join('');
+  container.querySelectorAll('.pill-btn').forEach((btn, i) => {
+    btn.onclick = () => onSelect(options[i].name);
+  });
+}
+
+function renderToppings() {
+  const container = document.getElementById('toppingGrid');
+  container.innerHTML = MENU.toppings.map(t =>
+    `<button class="topping-chip ${selectedToppings.has(t.name) ? 'active' : ''}">
+      <span class="check-icon">&#x2714;</span>
+      ${t.name}
+    </button>`
+  ).join('');
+  container.querySelectorAll('.topping-chip').forEach((chip, i) => {
+    chip.onclick = () => {
+      const name = MENU.toppings[i].name;
+      if (selectedToppings.has(name)) selectedToppings.delete(name);
+      else if (selectedToppings.size < 2) selectedToppings.add(name);
+      renderToppings();
+    };
+  });
+}
+
+function renderOrderList() {
+  const list = document.getElementById('orderList');
+  const empty = document.getElementById('emptyState');
+  const countBadge = document.getElementById('listCount');
+  const orderCountEl = document.getElementById('orderCount');
+
+  countBadge.textContent = orders.length;
+  orderCountEl.textContent = orders.length + ' 杯';
+
+  if (orders.length === 0) {
+    empty.classList.remove('hidden');
+    list.querySelectorAll('.order-item').forEach(el => el.remove());
+    return;
+  }
+
+  empty.classList.add('hidden');
+
+  const editToken = localStorage.getItem('editToken_' + currentSessionId);
+  const isOrganizer = currentSession && localStorage.getItem('organizer_' + currentSessionId) === currentSession.organizerToken;
+  const isOpen = currentSession && currentSession.status === 'OPEN';
+
+  let html = '';
+  orders.forEach(o => {
+    const canEdit = isOpen && (o.editToken === editToken || isOrganizer);
+    const toppingsStr = (o.toppings && o.toppings.length) ? ' + ' + o.toppings.join('、') : '';
+    html += `
+      <div class="order-item">
+        <div class="order-item-header">
+          <span class="order-item-name">${escHtml(o.userName)}</span>
+          ${canEdit ? `
+            <div class="order-item-actions">
+              <button class="order-item-btn" onclick="editOrder('${o.id}')">編輯</button>
+              <button class="order-item-btn delete" onclick="deleteOrder('${o.id}')">刪除</button>
+            </div>
+          ` : ''}
+        </div>
+        <div class="order-item-drink">${escHtml(o.drinkName)}（${escHtml(o.size || '中杯')}）${toppingsStr ? '<span style="font-weight:400;color:#888;font-size:13px;"> ' + escHtml(toppingsStr) + '</span>' : ''}</div>
+        <div class="order-item-details">${escHtml(o.sugar)} / ${escHtml(o.ice)}${o.note ? ' / ' + escHtml(o.note) : ''}</div>
+      </div>
+    `;
+  });
+
+  // Keep empty state element but replace order items
+  const existingItems = list.querySelectorAll('.order-item');
+  existingItems.forEach(el => el.remove());
+  list.insertAdjacentHTML('beforeend', html);
+}
+
+function renderSummary() {
+  const content = document.getElementById('summaryContent');
+
+  // Group by drink+size+sugar+ice+toppings
+  const groups = {};
+  let totalCups = 0;
+  orders.forEach(o => {
+    const size = o.size || '中杯';
+    const key = `${o.drinkName}|${size}|${o.sugar}|${o.ice}|${(o.toppings||[]).sort().join(',')}`;
+    if (!groups[key]) {
+      groups[key] = { drink: o.drinkName, size: size, sugar: o.sugar, ice: o.ice, toppings: o.toppings || [], count: 0, people: [] };
+    }
+    groups[key].count++;
+    groups[key].people.push(o.userName);
+    totalCups++;
+  });
+
+  let html = '<div class="summary-total">' + totalCups + ' 杯</div>';
+
+  Object.values(groups).sort((a, b) => b.count - a.count).forEach(g => {
+    const toppingsStr = g.toppings.length ? ' + ' + g.toppings.join('、') : '';
+    html += `
+      <div class="summary-row">
+        <div>
+          <div class="drink-name">${escHtml(g.drink)}（${escHtml(g.size)}）${escHtml(toppingsStr)}</div>
+          <div style="font-size:12px;color:#999;">${escHtml(g.sugar)} / ${escHtml(g.ice)}</div>
+          <div style="font-size:11px;color:#bbb;">${g.people.map(escHtml).join('、')}</div>
+        </div>
+        <div class="drink-count">x${g.count}</div>
+      </div>
+    `;
+  });
+
+  content.innerHTML = html;
+}
+
+/* ==============================================================
+   SHARE & COPY
+   ============================================================== */
+function shareLink() {
+  const url = window.location.origin + window.location.pathname + '#/order/' + currentSessionId;
+  if (navigator.share) {
+    navigator.share({ title: '50嵐揪團點單', text: '來點50嵐！', url: url }).catch(() => {});
+  } else {
+    showCopyModal('分享連結', url);
+  }
+}
+
+function copySummary() {
+  const groups = {};
+  let totalCups = 0;
+  orders.forEach(o => {
+    const size = o.size || '中杯';
+    const key = `${o.drinkName}|${size}|${o.sugar}|${o.ice}|${(o.toppings||[]).sort().join(',')}`;
+    if (!groups[key]) {
+      groups[key] = { drink: o.drinkName, size: size, sugar: o.sugar, ice: o.ice, toppings: o.toppings || [], count: 0 };
+    }
+    groups[key].count++;
+    totalCups++;
+  });
+
+  let text = '50嵐訂單\n';
+  text += '============\n';
+  Object.values(groups).sort((a, b) => b.count - a.count).forEach(g => {
+    const toppingsStr = g.toppings.length ? '+' + g.toppings.join('+') : '';
+    text += `${g.drink}(${g.size})${toppingsStr} (${g.sugar}/${g.ice}) x${g.count}\n`;
+  });
+  text += '============\n';
+  text += '共 ' + totalCups + ' 杯\n';
+
+  showCopyModal('統計摘要', text);
+}
+
+function showCopyModal(title, text) {
+  // Remove existing modal if any
+  const existing = document.getElementById('copyModal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'copyModal';
+  overlay.className = 'copy-modal-overlay';
+  overlay.innerHTML = `
+    <div class="copy-modal">
+      <h4>${escHtml(title)}</h4>
+      <textarea readonly id="copyModalText">${escHtml(text)}</textarea>
+      <p class="hint">長按文字 → 全選 → 複製</p>
+      <button class="copy-modal-close" id="copyModalClose">關閉</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Auto-select all text
+  const ta = document.getElementById('copyModalText');
+  ta.focus();
+  ta.select();
+
+  // Try clipboard copy silently
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        document.querySelector('#copyModal .hint').textContent = '已自動複製到剪貼簿！';
+      }).catch(() => {});
+    }
+  } catch(e) {}
+
+  // Close handlers
+  document.getElementById('copyModalClose').onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+/* ==============================================================
+   FORM HELPERS
+   ============================================================== */
+function showFormAgain() {
+  document.getElementById('orderForm').classList.remove('hidden');
+  document.getElementById('confirmAnim').classList.add('hidden');
+  document.getElementById('addAnotherBtn').classList.add('hidden');
+  document.getElementById('submitBtn').textContent = '送出點單';
+  editingOrderId = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetFormSelections() {
+  selectedDrink = null;
+  selectedSize = null;
+  selectedSugar = null;
+  selectedIce = null;
+  selectedToppings.clear();
+  document.getElementById('inputNote').value = '';
+  renderDrinkGrid();
+  renderSizePills();
+  renderSugarPills();
+  renderIcePills();
+  renderToppings();
+}
+
+/* ==============================================================
+   UTILITY
+   ============================================================== */
+
+function escHtml(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+function showLoading(show) {
+  document.getElementById('loading').classList.toggle('hidden', !show);
+}
+
+/* ==============================================================
+   ROUTER
+   ============================================================== */
+function handleRoute() {
+  const hash = window.location.hash || '#/';
+  const match = hash.match(/^#\/order\/(.+)$/);
+
+  if (match) {
+    const sessionId = match[1];
+    loadSession(sessionId);
+  } else {
+    // Landing page
+    showView('viewLanding');
+    document.getElementById('headerSubtitle').textContent = '大家一起來點飲料';
+    document.getElementById('headerActions').innerHTML = '';
+    if (unsubSession) { unsubSession(); unsubSession = null; }
+    if (unsubOrders) { unsubOrders(); unsubOrders = null; }
+  }
+}
+
+/* ==============================================================
+   INIT
+   ============================================================== */
+window.addEventListener('hashchange', handleRoute);
+window.addEventListener('DOMContentLoaded', () => {
+  initFirebase();
+  handleRoute();
+});
+</script>
+</body>
+</html>
