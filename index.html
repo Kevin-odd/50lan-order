@@ -965,14 +965,14 @@ function setCloseMode(mode) {
 function renderTimePills() {
   const container = document.getElementById('timePills');
   const now = new Date();
-  // Round up to next 15-min mark
+  // Round up to next 30-min mark
   const mins = now.getMinutes();
   const nextSlot = new Date(now);
-  nextSlot.setMinutes(Math.ceil((mins + 1) / 15) * 15, 0, 0);
+  nextSlot.setMinutes(Math.ceil((mins + 1) / 30) * 30, 0, 0);
 
   let html = '';
-  for (let i = 0; i < 8; i++) {
-    const slot = new Date(nextSlot.getTime() + i * 15 * 60 * 1000);
+  for (let i = 0; i < 6; i++) {
+    const slot = new Date(nextSlot.getTime() + i * 30 * 60 * 1000);
     const hh = String(slot.getHours()).padStart(2, '0');
     const mm = String(slot.getMinutes()).padStart(2, '0');
     const label = hh + ':' + mm;
