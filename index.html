@@ -488,6 +488,78 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
 .confirm-anim .check { font-size: 56px; }
 .confirm-anim p { font-size: 16px; font-weight: 600; color: #22c55e; margin: 8px 0 0; }
 
+/* ============================================================
+   13. SETUP MODAL (closing time picker)
+   ============================================================ */
+.setup-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.setup-modal {
+  background: #fff; border-radius: 20px;
+  padding: 24px 20px; max-width: 400px; width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.setup-modal h3 {
+  font-size: 18px; font-weight: 700; margin: 0 0 6px; color: #333;
+}
+.setup-modal .sub { font-size: 13px; color: #999; margin: 0 0 16px; }
+.setup-option {
+  display: flex; gap: 8px; margin-bottom: 16px;
+}
+.setup-option-btn {
+  flex: 1; padding: 12px 8px;
+  border: 2px solid #eee; border-radius: 12px;
+  font-size: 14px; font-weight: 600;
+  background: #fff; color: #555; text-align: center;
+  transition: all 0.15s;
+}
+.setup-option-btn.active { border-color: #E8960C; background: #FFF8EB; color: #E8960C; }
+.setup-option-btn:active { transform: scale(0.96); }
+.time-picker-area { margin-bottom: 16px; }
+.time-picker-label { font-size: 13px; font-weight: 600; color: #666; margin-bottom: 8px; }
+.time-pills {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.time-pill {
+  padding: 10px 16px;
+  border: 2px solid #eee; border-radius: 14px;
+  font-size: 15px; font-weight: 600;
+  background: #fff; color: #555;
+  transition: all 0.15s;
+}
+.time-pill.active { border-color: #E8960C; background: #FFF8EB; color: #E8960C; }
+.time-pill:active { transform: scale(0.95); }
+.setup-go-btn {
+  width: 100%; padding: 16px;
+  border-radius: 14px; font-size: 17px; font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #E8960C 0%, #D4820A 100%);
+  box-shadow: 0 4px 12px rgba(232,150,12,0.3);
+  transition: transform 0.15s;
+}
+.setup-go-btn:active { transform: scale(0.97); }
+.setup-go-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+/* ============================================================
+   14. DEADLINE BANNER
+   ============================================================ */
+.deadline-banner {
+  background: #FFF8EB;
+  border-bottom: 1px solid #f0e6d6;
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 14px; font-weight: 600; color: #E8960C;
+  max-width: 480px; margin: 0 auto;
+}
+.deadline-banner.urgent {
+  background: #fef2f2; color: #ef4444;
+  border-bottom-color: #fecaca;
+}
+
 /* Utility: hide */
 .hidden { display: none !important; }
 </style>
@@ -524,7 +596,7 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
     <div class="landing-logo">&#x1F9CB;</div>
     <h2>50嵐揪團點單</h2>
     <p>一鍵建立訂單連結<br/>同事打開就能點，即時同步超方便</p>
-    <button class="create-btn" onclick="createSession()">我要揪團</button>
+    <button class="create-btn" onclick="showSetupModal()">我要揪團</button>
   </div>
 </div>
 
@@ -541,6 +613,9 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
     </div>
     <div style="font-size:12px;color:#bbb;" id="orderCount"></div>
   </div>
+
+  <!-- Deadline banner (visible when closeAt is set) -->
+  <div class="deadline-banner hidden" id="deadlineBanner"></div>
 
   <!-- Closed banner (only visible when closed & not organizer) -->
   <div class="closed-banner hidden" id="closedBanner">
@@ -676,48 +751,101 @@ const FIREBASE_CONFIG = {
    ============================================================== */
 const MENU = {
   categories: [
-    { id: 'tea', name: '找好茶', icon: '&#x1F375;' },
-    { id: 'milk_tea', name: '找奶茶', icon: '&#x1F95B;' },
-    { id: 'latte', name: '找拿鐵', icon: '&#x1F37C;' },
-    { id: 'special', name: '找口感', icon: '&#x2B50;' },
-    { id: 'macchiato', name: '瑪奇朵', icon: '&#x2601;' },
-    { id: 'fresh', name: '找新鮮', icon: '&#x1F34B;' }
+    { id: 'tea', name: '找好茶' },
+    { id: 'milk_tea', name: '找奶茶' },
+    { id: 'special', name: '找口感' },
+    { id: 'latte', name: '找拿鐵' },
+    { id: 'fresh', name: '找新鮮' }
   ],
   items: [
-    // 找好茶
-    { name: '茉莉綠茶', category: 'tea', tag: '清爽解渴' },
-    { name: '阿薩姆紅茶', category: 'tea', tag: '經典基底茶' },
-    { name: '四季春青茶', category: 'tea', tag: '50嵐招牌' },
-    { name: '黃金烏龍', category: 'tea', tag: '焙火香氣' },
-    // 找奶茶
-    { name: '奶茶', category: 'milk_tea', tag: '經典' },
-    { name: '奶綠', category: 'milk_tea', tag: '經典' },
-    { name: '烏龍奶茶', category: 'milk_tea', tag: '經典' },
-    { name: '珍珠奶茶', category: 'milk_tea', tag: '國民飲料' },
-    { name: '波霸奶茶', category: 'milk_tea', tag: '國民飲料' },
-    { name: '燕麥奶茶', category: 'milk_tea', tag: '飽足感' },
-    { name: '布丁奶茶', category: 'milk_tea', tag: '甜度較高' },
-    // 找拿鐵
-    { name: '紅茶拿鐵', category: 'latte', tag: '鮮乳調配' },
-    { name: '綠茶拿鐵', category: 'latte', tag: '鮮乳調配' },
-    { name: '波霸紅茶拿鐵', category: 'latte', tag: '招牌必點' },
-    { name: '麵茶紅茶拿鐵', category: 'latte', tag: '復古人氣' },
-    { name: '燕麥阿華田', category: 'latte', tag: '冬季熱門' },
-    // 找口感
-    { name: '1號 (四季春+珍波椰)', category: 'special', tag: '銷量冠軍' },
-    { name: '8冰綠 (金桔+梅汁+綠茶)', category: 'special', tag: '酸甜NO.1' },
-    { name: '梅の綠', category: 'special', tag: '果香酸甜' },
-    { name: '冰淇淋紅茶', category: 'special', tag: '隱藏招牌' },
-    // 瑪奇朵
-    { name: '紅茶瑪奇朵', category: 'macchiato', tag: '甜奶蓋' },
-    { name: '烏龍瑪奇朵', category: 'macchiato', tag: '茶味平衡' },
-    { name: '四季奶青瑪奇朵', category: 'macchiato', tag: '網友熱推' },
-    // 找新鮮
-    { name: '檸檬綠', category: 'fresh', tag: '鮮酸甜' },
-    { name: '金桔檸檬', category: 'fresh', tag: '鮮酸甜' },
-    { name: '多多綠茶', category: 'fresh', tag: '經典不敗' },
-    { name: '鮮柚綠', category: 'fresh', tag: '季節限定' },
-    { name: '葡萄柚果粒茶', category: 'fresh', tag: '鮮果系列' }
+    // ===== 找好茶 =====
+    { name: '茉莉綠茶', category: 'tea' },
+    { name: '阿薩姆紅茶', category: 'tea' },
+    { name: '四季春青茶', category: 'tea' },
+    { name: '黃金烏龍', category: 'tea' },
+    { name: '檸檬綠', category: 'tea' },
+    { name: '檸檬紅', category: 'tea' },
+    { name: '梅の綠', category: 'tea' },
+    { name: '8冰綠', category: 'tea' },
+    { name: '桔子綠', category: 'tea' },
+    { name: '旺來紅', category: 'tea' },
+    { name: '旺來綠', category: 'tea' },
+    { name: '柚子烏龍', category: 'tea' },
+    { name: '柚子紅', category: 'tea' },
+    { name: '柚子綠', category: 'tea' },
+    { name: '柚子青', category: 'tea' },
+    { name: '微檸檬紅', category: 'tea' },
+    { name: '微檸檬青', category: 'tea' },
+    { name: '椰果紅', category: 'tea' },
+    { name: '椰果綠', category: 'tea' },
+    { name: '波霸紅', category: 'tea' },
+    { name: '波霸綠', category: 'tea' },
+    { name: '燕麥紅', category: 'tea' },
+    { name: '燕麥綠', category: 'tea' },
+    { name: '燕麥青', category: 'tea' },
+    { name: '冰淇淋紅茶', category: 'tea' },
+    // ===== 找奶茶 =====
+    { name: '奶茶', category: 'milk_tea' },
+    { name: '奶綠', category: 'milk_tea' },
+    { name: '烏龍奶', category: 'milk_tea' },
+    { name: '四季奶青', category: 'milk_tea' },
+    { name: '黃金烏龍奶', category: 'milk_tea' },
+    { name: '紅茶瑪奇朵', category: 'milk_tea' },
+    { name: '綠茶瑪奇朵', category: 'milk_tea' },
+    { name: '四季瑪奇朵', category: 'milk_tea' },
+    { name: '烏龍瑪奇朵', category: 'milk_tea' },
+    { name: '阿華田', category: 'milk_tea' },
+    { name: '燕麥阿華田', category: 'milk_tea' },
+    { name: '可可芭蕾', category: 'milk_tea' },
+    { name: '椰果奶茶', category: 'milk_tea' },
+    { name: '燕麥奶茶', category: 'milk_tea' },
+    { name: '燕麥奶青', category: 'milk_tea' },
+    { name: '燕麥烏龍奶', category: 'milk_tea' },
+    { name: '冰淇淋奶茶', category: 'milk_tea' },
+    // ===== 找口感 =====
+    { name: '四季春+珍波椰', category: 'special' },
+    { name: '波霸紅茶', category: 'special' },
+    { name: '波霸綠茶', category: 'special' },
+    { name: '波霸青茶', category: 'special' },
+    { name: '波霸烏龍茶', category: 'special' },
+    { name: '波霸奶茶', category: 'special' },
+    { name: '波霸奶綠', category: 'special' },
+    { name: '珍珠紅茶', category: 'special' },
+    { name: '珍珠綠茶', category: 'special' },
+    { name: '珍珠青茶', category: 'special' },
+    { name: '珍珠黃金烏龍', category: 'special' },
+    { name: '珍珠奶茶', category: 'special' },
+    { name: '布丁奶茶', category: 'special' },
+    { name: '布丁奶綠', category: 'special' },
+    { name: '布丁奶青', category: 'special' },
+    { name: '布丁烏龍奶茶', category: 'special' },
+    { name: '布丁紅茶', category: 'special' },
+    { name: '布丁綠茶', category: 'special' },
+    { name: '布丁青茶', category: 'special' },
+    { name: '布丁黃金烏龍', category: 'special' },
+    // ===== 找拿鐵 =====
+    { name: '紅茶拿鐵', category: 'latte' },
+    { name: '綠茶拿鐵', category: 'latte' },
+    { name: '烏龍拿鐵', category: 'latte' },
+    { name: '珍珠紅茶拿鐵', category: 'latte' },
+    { name: '波霸紅茶拿鐵', category: 'latte' },
+    { name: '燕麥紅茶拿鐵', category: 'latte' },
+    { name: '布丁紅茶拿鐵', category: 'latte' },
+    { name: '冰淇淋紅茶拿鐵', category: 'latte' },
+    { name: '麵茶紅茶拿鐵', category: 'latte' },
+    { name: '阿華田拿鐵', category: 'latte' },
+    { name: '燕麥阿華田拿鐵', category: 'latte' },
+    { name: '可可芭蕾拿鐵', category: 'latte' },
+    { name: '波霸鮮奶', category: 'latte' },
+    { name: '珍珠鮮奶', category: 'latte' },
+    // ===== 找新鮮 =====
+    { name: '檸檬汁', category: 'fresh' },
+    { name: '金桔檸檬', category: 'fresh' },
+    { name: '檸檬梅汁', category: 'fresh' },
+    { name: '多多綠茶', category: 'fresh' },
+    { name: '多多紅茶', category: 'fresh' },
+    { name: '檸檬多多', category: 'fresh' },
+    { name: '多多檸檬綠', category: 'fresh' }
   ],
   size: [
     { name: '中杯', value: 'medium' },
@@ -742,14 +870,14 @@ const MENU = {
     { name: '熱', value: 'hot' }
   ],
   toppings: [
-    { name: '波霸', value: 'boba' },
     { name: '珍珠', value: 'pearl' },
+    { name: '波霸', value: 'boba' },
     { name: '椰果', value: 'coconut_jelly' },
+    { name: '混珠', value: 'mixed_pearl' },
+    { name: '珍波椰', value: 'pearl_boba_coconut' },
     { name: '仙草凍', value: 'grass_jelly' },
-    { name: '燕麥', value: 'oat' },
     { name: '布丁', value: 'pudding' },
-    { name: '冰淇淋', value: 'ice_cream' },
-    { name: '奶霜', value: 'macchiato' }
+    { name: '香草冰淇淋', value: 'vanilla_ice_cream' }
   ]
 };
 
@@ -806,18 +934,111 @@ function generateId() {
 /* ==============================================================
    SESSION MANAGEMENT
    ============================================================== */
-async function createSession() {
+/* ==============================================================
+   SETUP MODAL (closing time picker)
+   ============================================================== */
+let setupCloseMode = 'manual'; // 'manual' or 'timed'
+let setupCloseAt = null;
+
+function showSetupModal() {
+  setupCloseMode = 'manual';
+  setupCloseAt = null;
+
+  const existing = document.getElementById('setupModal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'setupModal';
+  overlay.className = 'setup-overlay';
+  overlay.innerHTML = `
+    <div class="setup-modal">
+      <h3>揪團設定</h3>
+      <p class="sub">選擇結單方式</p>
+      <div class="setup-option">
+        <button class="setup-option-btn active" id="setupManual" onclick="setCloseMode('manual')">手動結單</button>
+        <button class="setup-option-btn" id="setupTimed" onclick="setCloseMode('timed')">設定截止時間</button>
+      </div>
+      <div class="time-picker-area hidden" id="timePickerArea">
+        <div class="time-picker-label">選擇截止時間</div>
+        <div class="time-pills" id="timePills"></div>
+      </div>
+      <button class="setup-go-btn" id="setupGoBtn" onclick="confirmSetup()">開始揪團</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function setCloseMode(mode) {
+  setupCloseMode = mode;
+  document.getElementById('setupManual').className = 'setup-option-btn' + (mode === 'manual' ? ' active' : '');
+  document.getElementById('setupTimed').className = 'setup-option-btn' + (mode === 'timed' ? ' active' : '');
+
+  const area = document.getElementById('timePickerArea');
+  if (mode === 'timed') {
+    area.classList.remove('hidden');
+    renderTimePills();
+  } else {
+    area.classList.add('hidden');
+    setupCloseAt = null;
+  }
+}
+
+function renderTimePills() {
+  const container = document.getElementById('timePills');
+  const now = new Date();
+  // Round up to next 15-min mark
+  const mins = now.getMinutes();
+  const nextSlot = new Date(now);
+  nextSlot.setMinutes(Math.ceil((mins + 1) / 15) * 15, 0, 0);
+
+  let html = '';
+  for (let i = 0; i < 8; i++) {
+    const slot = new Date(nextSlot.getTime() + i * 15 * 60 * 1000);
+    const hh = String(slot.getHours()).padStart(2, '0');
+    const mm = String(slot.getMinutes()).padStart(2, '0');
+    const label = hh + ':' + mm;
+    const ts = slot.getTime();
+    const isActive = setupCloseAt === ts;
+    html += `<button class="time-pill ${isActive ? 'active' : ''}" onclick="pickTime(${ts})">${label}</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function pickTime(ts) {
+  setupCloseAt = ts;
+  renderTimePills();
+}
+
+function confirmSetup() {
+  if (setupCloseMode === 'timed' && !setupCloseAt) {
+    showToast('請選擇截止時間');
+    return;
+  }
+  const modal = document.getElementById('setupModal');
+  if (modal) modal.remove();
+  createSession(setupCloseMode === 'timed' ? setupCloseAt : null);
+}
+
+/* ==============================================================
+   SESSION MANAGEMENT
+   ============================================================== */
+let deadlineTimer = null;
+
+async function createSession(closeAt) {
   const sessionId = generateId();
   const organizerToken = 'org_' + generateId();
+
+  const sessionData = {
+    createdAt: isFirebaseReady ? firebase.firestore.FieldValue.serverTimestamp() : new Date(),
+    status: 'OPEN',
+    organizerToken: organizerToken,
+    closeAt: closeAt || null
+  };
 
   if (isFirebaseReady) {
     showLoading(true);
     try {
-      await db.collection('sessions').doc(sessionId).set({
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'OPEN',
-        organizerToken: organizerToken
-      });
+      await db.collection('sessions').doc(sessionId).set(sessionData);
     } catch (e) {
       console.error('Create session error:', e);
       showToast('建立失敗，請稍後再試');
@@ -826,17 +1047,12 @@ async function createSession() {
     }
     showLoading(false);
   } else {
-    // Demo mode
-    demoSessions[sessionId] = {
-      createdAt: new Date(),
-      status: 'OPEN',
-      organizerToken: organizerToken
-    };
+    sessionData.createdAt = new Date();
+    demoSessions[sessionId] = sessionData;
     demoOrders[sessionId] = [];
   }
 
   localStorage.setItem('organizer_' + sessionId, organizerToken);
-  // Also save last used name
   window.location.hash = '#/order/' + sessionId;
 }
 
@@ -1122,6 +1338,18 @@ function renderSessionState() {
   // Header subtitle
   document.getElementById('headerSubtitle').textContent = isOpen ? '點單進行中' : '訂單已結單';
 
+  // Deadline banner
+  const deadlineBanner = document.getElementById('deadlineBanner');
+  if (deadlineTimer) { clearInterval(deadlineTimer); deadlineTimer = null; }
+
+  if (currentSession.closeAt && isOpen) {
+    deadlineBanner.classList.remove('hidden');
+    updateDeadlineBanner();
+    deadlineTimer = setInterval(updateDeadlineBanner, 15000);
+  } else {
+    deadlineBanner.classList.add('hidden');
+  }
+
   // Form visibility
   const formSection = document.getElementById('formSection');
   const closedBanner = document.getElementById('closedBanner');
@@ -1142,6 +1370,51 @@ function renderSessionState() {
       document.getElementById('reopenBtn').classList.remove('hidden');
     }
   }
+}
+
+function updateDeadlineBanner() {
+  if (!currentSession || !currentSession.closeAt) return;
+  const banner = document.getElementById('deadlineBanner');
+  const closeAt = typeof currentSession.closeAt === 'number' ? currentSession.closeAt :
+    (currentSession.closeAt.toDate ? currentSession.closeAt.toDate().getTime() : currentSession.closeAt);
+  const now = Date.now();
+  const diff = closeAt - now;
+
+  if (diff <= 0) {
+    // Auto close
+    banner.textContent = '已到截止時間，自動結單中...';
+    banner.className = 'deadline-banner urgent';
+    if (deadlineTimer) { clearInterval(deadlineTimer); deadlineTimer = null; }
+    autoCloseSession();
+    return;
+  }
+
+  const mins = Math.ceil(diff / 60000);
+  const closeDate = new Date(closeAt);
+  const hh = String(closeDate.getHours()).padStart(2, '0');
+  const mm = String(closeDate.getMinutes()).padStart(2, '0');
+
+  if (mins <= 10) {
+    banner.textContent = '\u23F0 剩 ' + mins + ' 分鐘截止';
+    banner.className = 'deadline-banner urgent';
+  } else {
+    banner.textContent = '\u23F0 ' + hh + ':' + mm + ' 截止點單';
+    banner.className = 'deadline-banner';
+  }
+}
+
+async function autoCloseSession() {
+  const isOrganizer = currentSession && localStorage.getItem('organizer_' + currentSessionId) === currentSession.organizerToken;
+  if (isFirebaseReady && isOrganizer) {
+    try {
+      await db.collection('sessions').doc(currentSessionId).update({ status: 'CLOSED' });
+    } catch (e) { console.error('Auto close error:', e); }
+  } else if (!isFirebaseReady) {
+    demoSessions[currentSessionId].status = 'CLOSED';
+    currentSession = demoSessions[currentSessionId];
+    renderSessionState();
+  }
+  // Non-organizer clients will see the change via onSnapshot listener
 }
 
 function renderForm() {
