@@ -561,7 +561,51 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
 }
 
 /* ============================================================
-   15. FOOTNOTE
+   15. HELP MODAL
+   ============================================================ */
+.help-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff; font-size: 13px; font-weight: 600;
+  padding: 8px 12px; border-radius: 20px;
+  white-space: nowrap;
+}
+.help-btn:active { background: rgba(255,255,255,0.35); }
+.help-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.help-modal {
+  background: #fff; border-radius: 20px;
+  padding: 24px 20px; max-width: 380px; width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  position: relative;
+}
+.help-modal h3 {
+  font-size: 18px; font-weight: 700; margin: 0 0 16px; color: #333;
+}
+.help-modal .close-btn {
+  position: absolute; top: 16px; right: 16px;
+  background: #f0e6d6; color: #999;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700;
+}
+.help-modal .close-btn:active { background: #e0d6c6; }
+.help-modal ul {
+  margin: 0; padding: 0; list-style: none;
+}
+.help-modal li {
+  padding: 10px 0;
+  border-bottom: 1px solid #f5f0e8;
+  font-size: 14px; line-height: 1.5; color: #555;
+}
+.help-modal li:last-child { border-bottom: none; }
+
+/* ============================================================
+   16. FOOTNOTE
    ============================================================ */
 .footnote {
   text-align: center;
@@ -597,7 +641,9 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
       <h1>50嵐揪團</h1>
       <p class="header-subtitle" id="headerSubtitle">大家一起來點飲料</p>
     </div>
-    <div class="header-actions" id="headerActions"></div>
+    <div class="header-actions" id="headerActions">
+      <button class="help-btn" onclick="showHelp()">說明</button>
+    </div>
   </div>
 </header>
 
@@ -1276,12 +1322,13 @@ async function closeSession() {
 async function reopenSession() {
   if (isFirebaseReady) {
     try {
-      await db.collection('sessions').doc(currentSessionId).update({ status: 'OPEN' });
+      await db.collection('sessions').doc(currentSessionId).update({ status: 'OPEN', closeAt: null });
     } catch (e) {
       showToast('開放失敗');
     }
   } else {
     demoSessions[currentSessionId].status = 'OPEN';
+    demoSessions[currentSessionId].closeAt = null;
     currentSession = demoSessions[currentSessionId];
     renderSessionState();
   }
@@ -1324,6 +1371,12 @@ function renderSessionState() {
       actions.appendChild(closeBtn);
     }
   }
+
+  const helpBtn = document.createElement('button');
+  helpBtn.className = 'help-btn';
+  helpBtn.textContent = '說明';
+  helpBtn.onclick = showHelp;
+  actions.appendChild(helpBtn);
 
   // Header subtitle
   document.getElementById('headerSubtitle').textContent = isOpen ? '點單進行中' : '訂單已結單';
@@ -1597,6 +1650,30 @@ function copySummary() {
   text += '共 ' + totalCups + ' 杯\n';
 
   showCopyModal('統計摘要', text);
+}
+
+function showHelp() {
+  const existing = document.getElementById('helpModal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'helpModal';
+  overlay.className = 'help-overlay';
+  overlay.innerHTML = `
+    <div class="help-modal">
+      <button class="close-btn" onclick="document.getElementById('helpModal').remove()">&times;</button>
+      <h3>使用說明</h3>
+      <ul>
+        <li>誰按「我要揪團」誰就是主揪，只有主揪看得到「結單」按鈕</li>
+        <li>主揪身份綁定你的瀏覽器，換手機或清除瀏覽資料會失去權限</li>
+        <li>連結可重複開啟，關掉分頁不影響，從聊天紀錄再點一次就好</li>
+        <li>每次「我要揪團」都會產生全新訂單，跟之前的互不影響</li>
+        <li>設了截止時間的話，到時間會自動結單</li>
+      </ul>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 }
 
 function showCopyModal(title, text) {
