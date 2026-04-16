@@ -560,6 +560,19 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
   border-bottom-color: #fecaca;
 }
 
+/* ============================================================
+   15. FOOTNOTE
+   ============================================================ */
+.footnote {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.3px;
+  margin-top: 28px;
+  padding-bottom: 24px;
+}
+
 /* Utility: hide */
 .hidden { display: none !important; }
 </style>
@@ -597,6 +610,7 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
     <h2>50嵐揪團點單</h2>
     <p>一鍵建立訂單連結<br/>同事打開就能點，即時同步超方便</p>
     <button class="create-btn" onclick="showSetupModal()">我要揪團</button>
+    <p class="footnote">&copy; 2026 Crafted by KL</p>
   </div>
 </div>
 
@@ -704,6 +718,7 @@ input, textarea { font-family: inherit; font-size: 16px; /* prevent iOS zoom */ 
     <button class="copy-summary-btn" onclick="copySummary()">&#x1F4CB; 複製統計摘要（方便訂餐）</button>
     <button class="reopen-btn hidden" id="reopenBtn" onclick="reopenSession()">&#x1F513; 重新開放點單</button>
   </div>
+  <p class="footnote">&copy; 2026 Crafted by KL</p>
 </div>
 
 <script>
