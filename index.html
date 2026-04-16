@@ -1308,13 +1308,7 @@ function renderSummary() {
    ============================================================== */
 function shareLink() {
   const url = window.location.origin + window.location.pathname + '#/order/' + currentSessionId;
-  if (navigator.share) {
-    navigator.share({ title: '50嵐揪團點單', text: '來點50嵐！', url: url }).catch(() => {
-      showCopyModal('分享連結', url);
-    });
-  } else {
-    showCopyModal('分享連結', url);
-  }
+  showCopyModal('分享連結', url);
 }
 
 function copySummary() {
